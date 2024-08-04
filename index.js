@@ -2,23 +2,10 @@ import { MongoClient } from "mongodb";
 import express from "express";
 import cors from "cors";
 
-const uri = "mongodb+srv://henriquebkotz:bcUrLHd4gDSh8GyW@barbearia-db.ihxjsbx.mongodb.net/?retryWrites=true&w=majority&appName=barbearia-db";
+import dotenv from "dotenv";
+dotenv.config();
 
-const client = new MongoClient(uri);
-
-async function run() {
-    try {
-        const database = client.db('barbearia_db');
-        const customers = database.collection('barbearia_tb');
-
-        const query = { name: "Henrique Kötz" };
-        const customer = await customers.findOne(query);
-
-        console.log(customer);
-    } finally {
-        await client.close();
-    }
-}
+const client = new MongoClient(process.env.MONGO_URI);
 
 const app = express();
 app.use(cors());
@@ -41,17 +28,27 @@ app.get('/', async (req, res) => {
         console.log(error);
         res.sendStatus(500);
     }
-    finally {
-        await client.close();
-    }
 })
 
 app.post('/', async (req, res) => {
     try {
         const { body } = req;
+        const { name, phone } = body;
 
         const database = client.db('barbearia_db');
         const customers = database.collection('barbearia_tb');
+
+        const existingCustomer = await customers.findOne({ name: body.name });
+        if (existingCustomer) return res.sendStatus(400);
+        
+        const nameRegex = "^[a-z A-Z]{4,40}$";
+        const phoneRegex = "^[0-9]{11}$";
+        const trimmedName = name.trim();
+
+        const validName = trimmedName.match(nameRegex);
+        const validPhone = phone.match(phoneRegex);
+        if (!validName || !validPhone) return res.sendStatus(400);
+
 
         await customers.insertOne(body);
 
@@ -59,8 +56,6 @@ app.post('/', async (req, res) => {
     } catch (error) {
         console.log(error);
         res.sendStatus(500);
-    } finally {
-        await client.close();
     }
 })
 
@@ -68,5 +63,3 @@ app.post('/', async (req, res) => {
 app.listen(5000, () => {
     console.log('Listening on port 5000...');
 })
-
-//run().catch(console.dir);
